@@ -1,0 +1,54 @@
+{
+  "name": "Pi Console - Weekly Deep Research",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Monday at 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:7001/api/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"pipeline_id\": \"deep-research\",\n  \"name\": \"Weekly Deep Research - {{ $now.format('yyyy-MM-dd') }}\",\n  \"trigger_type\": \"scheduled\"\n}",
+        "options": {}
+      },
+      "id": "trigger-deep-research",
+      "name": "Trigger Deep Research Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Every Monday at 9AM": {
+      "main": [
+        [
+          {
+            "node": "Trigger Deep Research Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

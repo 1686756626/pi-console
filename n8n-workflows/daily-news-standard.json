@@ -1,0 +1,54 @@
+{
+  "name": "Pi Console - Daily News Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Day at 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:7001/api/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"pipeline_id\": \"standard\",\n  \"name\": \"Daily News - {{ $now.format('yyyy-MM-dd') }}\",\n  \"trigger_type\": \"scheduled\"\n}",
+        "options": {}
+      },
+      "id": "trigger-pipeline",
+      "name": "Trigger Standard Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Every Day at 8AM": {
+      "main": [
+        [
+          {
+            "node": "Trigger Standard Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
