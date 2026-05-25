@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session, engine
 from app.models.models import Base
 from app.models.models import Agent, Space, PipelineModel
-from app.api import agents, plans, steps, artifacts, news, documents, dashboard, internal, rag, docmost, webhook, exports, wiki, tags, memos, checkpoints, pipelines, scheduler, knowledge, audit, mcp_servers, memories, chat, today, materials, writing, writing_ai, review
+from app.api import agents, plans, steps, artifacts, news, documents, dashboard, internal, rag, docmost, webhook, exports, wiki, tags, memos, checkpoints, pipelines, scheduler, knowledge, audit, mcp_servers, memories, chat, today, today_ai, materials, writing, writing_ai, review
 from app.middleware.audit import AuditMiddleware
 from app.middleware.auth import AuthMiddleware
 
@@ -194,6 +194,7 @@ app.include_router(mcp_servers.router, prefix="/api", tags=["mcp"])
 app.include_router(memories.router, prefix="/api", tags=["memories"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(today.router, prefix="/api", tags=["today"])
+app.include_router(today_ai.router, prefix="/api", tags=["today-ai"])
 app.include_router(materials.router, prefix="/api", tags=["materials"])
 app.include_router(writing.router, prefix="/api", tags=["writing"])
 app.include_router(writing_ai.router, prefix="/api", tags=["writing-ai"])

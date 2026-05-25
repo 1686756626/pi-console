@@ -1,5 +1,5 @@
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useCallback, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { client } from "../api";
 import { Card, Button, Tag } from "../ui";
@@ -16,6 +16,7 @@ import {
 
   Sparkles,
   TrendingUp,
+  Loader,
 } from "lucide-react";
 
 interface TodayOverview {
@@ -48,7 +49,8 @@ interface TodayOverview {
     updated_at: string;
   }[];
   suggestions: {
-    type: "action" | "idea" | "reminder" | "review";
+    title: string;
+    type?: "action" | "idea" | "reminder" | "review";
     message: string;
     action: string;
   }[];
@@ -177,17 +179,32 @@ export default function TodayWorkbench() {
   const [overview, setOverview] = useState<TodayOverview | null>(null);
   const [trend, setTrend] = useState<TrendDay[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<TodayOverview["suggestions"] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     client.get<TodayOverview>("/today/overview").then((r) => setOverview(r.data));
     client.get<TrendDay[]>("/today/stats-trend", { params: { days: 7 } }).then((r) => setTrend(r.data));
   }, []);
 
+  const fetchAiSuggestions = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const { data } = await client.get<{ suggestions: TodayOverview["suggestions"] }>("/today/ai-suggestions");
+      setAiSuggestions(data.suggestions);
+    } catch {
+      setAiSuggestions(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
   const handleSuggestionAction = (action: string) => {
-    if (action === "refresh_news") navigate("/news");
-    else if (action === "new_writing") navigate("/writing");
+    if (action === "refresh_news") navigate("/vault");
+    else if (action === "new_writing" || action === "continue_writing") navigate("/writing");
     else if (action === "new_memo") navigate("/memos");
     else if (action === "review_artifacts") navigate("/runs");
+    else if (action === "check_runs") navigate("/runs");
   };
 
   if (!overview) {
@@ -217,41 +234,67 @@ export default function TodayWorkbench() {
         <div style={{ fontSize: 14, color: "var(--ht-fg-secondary)", marginTop: 6 }}>{formattedDate}</div>
       </div>
 
-      {overview.suggestions.length > 0 && (
-        <div style={{ display: "flex", gap: 12, marginBottom: 24, overflowX: "auto", paddingBottom: 4 }}>
-          {overview.suggestions.map((s, i) => {
-            const Icon = suggestionIcon[s.type] || Sparkles;
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ ...sectionIcon, background: "var(--ht-accent-muted)", color: "var(--ht-accent)" }}>
+            <Sparkles size={13} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ht-fg)" }}>智能建议</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchAiSuggestions}
+            disabled={aiLoading}
+            style={{ marginLeft: "auto" }}
+          >
+            {aiLoading ? <Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={12} />}
+            {aiLoading ? "分析中..." : "AI 生成建议"}
+          </Button>
+        </div>
+        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+          {(aiSuggestions || overview.suggestions).length === 0 && !aiLoading && (
+            <div style={{ fontSize: 13, color: "var(--ht-fg-secondary)", padding: "12px 0" }}>
+              点击"AI 生成建议"获取个性化工作建议
+            </div>
+          )}
+          {(aiSuggestions || overview.suggestions).map((s, i) => {
+            const Icon = suggestionIcon[s.type || "action"] || Sparkles;
             return (
               <Card
                 key={i}
                 variant="outlined"
                 style={{
                   padding: "14px 18px",
-                  minWidth: 220,
+                  minWidth: 240,
                   flexShrink: 0,
                   display: "flex",
-                  alignItems: "center",
-                  gap: 12,
+                  flexDirection: "column",
+                  gap: 8,
                   borderRadius: "var(--ht-radius-lg)",
                 }}
               >
-                <div
-                  style={{
-                    ...sectionIcon,
-                    background: "var(--ht-accent-muted)",
-                    color: "var(--ht-accent)",
-                  }}
-                >
-                  <Icon size={14} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{
+                      ...sectionIcon,
+                      background: "var(--ht-accent-muted)",
+                      color: "var(--ht-accent)",
+                    }}
+                  >
+                    <Icon size={14} />
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ht-fg)" }}>
+                    {s.title || "建议"}
+                  </span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "var(--ht-fg)", lineHeight: 1.4 }}>{s.message}</div>
+                <div style={{ fontSize: 13, color: "var(--ht-fg-secondary)", lineHeight: 1.5 }}>
+                  {s.message}
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleSuggestionAction(s.action)}
-                  style={{ flexShrink: 0 }}
+                  style={{ alignSelf: "flex-end", flexShrink: 0 }}
                 >
                   {suggestionActionLabel[s.action] || "执行"}
                   <ArrowRight size={12} />
@@ -260,7 +303,7 @@ export default function TodayWorkbench() {
             );
           })}
         </div>
-      )}
+      </div>
 
       <div
         style={{
