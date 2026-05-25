@@ -72,7 +72,7 @@ async def get_pending_tasks(
 ):
     result = await db.execute(
         select(Run)
-        .where(Run.status == RunStatus.RUNNING)
+        .where(Run.status.in_([RunStatus.RUNNING, RunStatus.PENDING]))
         .options(selectinload(Run.plans))
         .order_by(Run.created_at)
         .limit(10)

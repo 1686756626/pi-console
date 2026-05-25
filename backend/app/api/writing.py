@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -121,7 +121,7 @@ async def create_draft(project_id: str, body: DraftCreate, db: AsyncSession = De
         raise HTTPException(404, "项目不存在")
 
     max_ver = await db.scalar(
-        select(desc(WritingDraft.version)).where(WritingDraft.project_id == project_id)
+        select(func.max(WritingDraft.version)).where(WritingDraft.project_id == project_id)
     )
     version = (max_ver or 0) + 1
 

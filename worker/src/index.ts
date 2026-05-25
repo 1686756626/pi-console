@@ -119,6 +119,7 @@ async function processTask(task: {
   } catch (err: any) {
     console.error(`[worker] 步骤 ${task.step_order} 失败:`, err.message);
     await updateStepStatus(task.step_id, "failed", err.message).catch(() => {});
+    await updateRunStatus(task.run_id, "failed", err.message).catch(() => {});
   }
 }
 
@@ -142,8 +143,23 @@ async function mainLoop() {
 
         const remaining = await getPendingTasks();
         if (remaining.length === 0) {
-          await updateRunStatus(task.run_id, "succeeded").catch(() => {});
-          console.log(`[worker] 运行 ${task.run_name} 全部完成`);
+          const { default: axios } = await import("axios");
+          const apiBase = process.env.API_BASE_URL || "http://localhost:7001";
+          const secret = process.env.WORKER_SECRET || "change-me-in-production";
+          const runResp = await axios.get(`${apiBase}/api/runs/${task.run_id}`, {
+            headers: { "X-Worker-Secret": secret },
+          });
+          const runData = runResp.data;
+          const hasFailed = runData.plans?.some((p: any) =>
+            p.steps?.some((s: any) => s.status === "failed"),
+          );
+          if (hasFailed) {
+            await updateRunStatus(task.run_id, "failed").catch(() => {});
+            console.log(`[worker] 运行 ${task.run_name} 有失败步骤，标记为 failed`);
+          } else {
+            await updateRunStatus(task.run_id, "succeeded").catch(() => {});
+            console.log(`[worker] 运行 ${task.run_name} 全部完成`);
+          }
         }
       }
     } catch (err: any) {

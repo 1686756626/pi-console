@@ -246,6 +246,7 @@ const PAGE_STYLE = `
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
+  position: relative;
 }
 
 .wr-empty {
@@ -401,6 +402,8 @@ export default function WritingRoom() {
   const [listLoading, setListLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [gathering, setGathering] = useState(false)
+  const [aiLoading, setAiLoading] = useState<string | null>(null)
+  const [aiResult, setAiResult] = useState<{ key: string; content: string } | null>(null)
   const [activeTab, setActiveTab] = useState<string>('topic')
   const [editTitle, setEditTitle] = useState('')
   const [editTopic, setEditTopic] = useState('')
@@ -538,6 +541,30 @@ export default function WritingRoom() {
     handlePatch({ status: 'published' })
   }
 
+  const callAi = async (action: string, extraBody?: Record<string, string>) => {
+    if (!project) return
+    setAiLoading(action)
+    setAiResult(null)
+    try {
+      const { data } = await client.post(
+        `/writing/projects/${project.id}/ai/${action}`,
+        extraBody || {},
+      )
+      const content = data.skeleton || data.counter_arguments || data.content
+        || (data.checks ? Object.entries(data.checks as Record<string, string>)
+          .map(([k, v]) => `## ${k === 'fact' ? '事实核查' : k === 'logic' ? '逻辑检查' : '风格审查'}\n${v}`)
+          .join('\n\n---\n\n') : '')
+      setAiResult({ key: action, content })
+      if (data.draft_id) {
+        await fetchProject(project.id)
+      }
+    } catch (e: any) {
+      setAiResult({ key: action, content: `AI 调用失败: ${e.response?.data?.detail || e.message}` })
+    } finally {
+      setAiLoading(null)
+    }
+  }
+
   const currentStatusIdx = project ? STATUS_FLOW.indexOf(project.status) : 0
   const tabStatusIdx = (tabKey: string): number => {
     if (tabKey === 'complete') return STATUS_FLOW.indexOf('reviewing')
@@ -637,6 +664,50 @@ export default function WritingRoom() {
               </div>
 
               <div className="wr-content">
+                {aiLoading && (
+                  <div style={{
+                    position: 'absolute', inset: 0, zIndex: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'color-mix(in srgb, var(--ht-bg) 85%, transparent)',
+                    borderRadius: 'inherit',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--ht-accent)' }}>
+                      <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        {aiLoading === 'skeleton' ? '生成论点骨架...'
+                          : aiLoading === 'counter-arguments' ? '分析反方观点...'
+                          : aiLoading === 'generate-draft' ? '生成草稿...'
+                          : '检查中...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {aiResult && !aiLoading && (
+                  <div style={{
+                    position: 'absolute', top: 0, right: 0, zIndex: 10,
+                    width: '50%', maxWidth: 560, maxHeight: '90%',
+                    overflow: 'auto', margin: '0.75rem',
+                    padding: '1rem', borderRadius: 'var(--ht-radius-lg)',
+                    border: '1px solid var(--ht-border)',
+                    background: 'var(--ht-surface)',
+                    boxShadow: 'var(--ht-shadow)',
+                    fontSize: '0.8125rem', lineHeight: 1.7,
+                    color: 'var(--ht-text)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--ht-accent)' }}>
+                        AI 分析结果
+                      </span>
+                      <button
+                        onClick={() => setAiResult(null)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ht-text-3)', fontSize: '0.75rem' }}
+                      >
+                        关闭
+                      </button>
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{aiResult.content}</div>
+                  </div>
+                )}
                 {activeTab === 'topic' && (
                   <div>
                     <div className="wr-section">
@@ -717,6 +788,10 @@ export default function WritingRoom() {
                       ))
                     )}
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                      <Button variant="ghost" size="sm" onClick={() => callAi('counter-arguments')} disabled={!!aiLoading}>
+                        <Sparkles size={12} />
+                        反方观点分析
+                      </Button>
                       <Button variant="outline" size="sm" onClick={handleNextStage}>
                         下一步: 撰写提纲
                         <ArrowRight size={12} />
@@ -728,7 +803,13 @@ export default function WritingRoom() {
                 {activeTab === 'outline' && (
                   <div>
                     <div className="wr-section">
-                      <label className="wr-field-label">文章提纲</label>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <label className="wr-field-label" style={{ marginBottom: 0 }}>文章提纲</label>
+                        <Button variant="ghost" size="sm" onClick={() => callAi('skeleton')} disabled={!!aiLoading}>
+                          <Sparkles size={12} />
+                          AI 生成骨架
+                        </Button>
+                      </div>
                       <textarea
                         style={{
                           ...inputStyle,
@@ -757,6 +838,16 @@ export default function WritingRoom() {
 
                 {activeTab === 'drafting' && (
                   <div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                      <Button variant="ghost" size="sm" onClick={() => callAi('generate-draft')} disabled={!!aiLoading}>
+                        <Sparkles size={12} />
+                        AI 生成草稿
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => callAi('check', { check_type: 'all', draft_content: editDraft })} disabled={!!aiLoading || !editDraft.trim()}>
+                        <Sparkles size={12} />
+                        三检（事实/逻辑/文风）
+                      </Button>
+                    </div>
                     {project.drafts && project.drafts.length > 0 && (
                       <div className="wr-section">
                         <div className="wr-section-title">历史版本 ({project.drafts.length})</div>
