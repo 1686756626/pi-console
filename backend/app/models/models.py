@@ -499,3 +499,48 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
 
     session: Mapped["ChatSession"] = relationship(back_populates="messages")
+
+
+class WritingProject(Base):
+    __tablename__ = "writing_projects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    topic: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="topic")
+    outline: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list | None] = mapped_column(JSONList, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+    drafts: Mapped[list["WritingDraft"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    materials: Mapped[list["WritingMaterial"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+
+
+class WritingDraft(Base):
+    __tablename__ = "writing_drafts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("writing_projects.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
+
+    project: Mapped["WritingProject"] = relationship(back_populates="drafts")
+
+
+class WritingMaterial(Base):
+    __tablename__ = "writing_materials"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("writing_projects.id", ondelete="CASCADE"), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relevance_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_now)
+
+    project: Mapped["WritingProject"] = relationship(back_populates="materials")

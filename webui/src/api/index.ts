@@ -1,5 +1,7 @@
 import client from "./client";
 
+export { client };
+
 export interface Agent {
   id: string;
   name: string;
@@ -499,5 +501,34 @@ export const api = {
       client.delete(`/chat/sessions/${sessionId}`).then((r) => r.data),
     appendMessages: (sessionId: string, messages: { role: string; content: string }[]) =>
       client.post(`/chat/sessions/${sessionId}/messages`, { messages }).then((r) => r.data),
+  },
+  today: {
+    overview: () => client.get("/today/overview").then((r) => r.data),
+    statsTrend: (days?: number) => client.get("/today/stats-trend", { params: { days } }).then((r) => r.data),
+  },
+  materials: {
+    list: (params?: { type?: string; keyword?: string; limit?: number }) =>
+      client.get("/materials", { params }).then((r) => r.data),
+    search: (q: string) => client.get("/materials/search", { params: { q } }).then((r) => r.data),
+  },
+  writing: {
+    list: (status?: string) =>
+      client.get("/writing/projects", { params: { status } }).then((r) => r.data),
+    get: (id: string) => client.get(`/writing/projects/${id}`).then((r) => r.data),
+    create: (data: { title: string; topic?: string }) =>
+      client.post("/writing/projects", data).then((r) => r.data),
+    update: (id: string, data: Record<string, unknown>) =>
+      client.patch(`/writing/projects/${id}`, data).then((r) => r.data),
+    delete: (id: string) => client.delete(`/writing/projects/${id}`).then((r) => r.data),
+    createDraft: (id: string, data: { content: string; label?: string }) =>
+      client.post(`/writing/projects/${id}/drafts`, data).then((r) => r.data),
+    addMaterial: (id: string, data: Record<string, unknown>) =>
+      client.post(`/writing/projects/${id}/materials`, data).then((r) => r.data),
+    autoGather: (id: string) =>
+      client.post(`/writing/projects/${id}/auto-gather`).then((r) => r.data),
+  },
+  review: {
+    daily: (days?: number) => client.get("/review/daily", { params: { days } }).then((r) => r.data),
+    insights: () => client.get("/review/insights").then((r) => r.data),
   },
 };

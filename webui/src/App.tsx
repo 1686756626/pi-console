@@ -1,8 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
 
+const TodayWorkbench = lazy(() => import("./pages/TodayWorkbench"));
+const MaterialPool = lazy(() => import("./pages/MaterialPool"));
+const WritingRoom = lazy(() => import("./pages/WritingRoom"));
+const ReviewRoom = lazy(() => import("./pages/ReviewRoom"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Agents = lazy(() => import("./pages/Agents"));
 const AgentDetail = lazy(() => import("./pages/AgentDetail"));
 const Runs = lazy(() => import("./pages/Runs"));
@@ -37,8 +41,12 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/" element={<Navigate to="/today" replace />} />
+        <Route path="/dashboard" element={<LazyPage><Dashboard /></LazyPage>} />
+        <Route path="/today" element={<LazyPage><TodayWorkbench /></LazyPage>} />
+        <Route path="/materials" element={<LazyPage><MaterialPool /></LazyPage>} />
+        <Route path="/writing" element={<LazyPage><WritingRoom /></LazyPage>} />
+        <Route path="/review" element={<LazyPage><ReviewRoom /></LazyPage>} />
         <Route path="/agents" element={<LazyPage><Agents /></LazyPage>} />
         <Route path="/agents/:id" element={<LazyPage><AgentDetail /></LazyPage>} />
         <Route path="/pipelines" element={<LazyPage><Pipelines /></LazyPage>} />

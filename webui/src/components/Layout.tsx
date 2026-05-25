@@ -13,6 +13,9 @@ import {
   Shield,
   Cpu,
   Cable,
+  Newspaper,
+  PenTool,
+  CalendarCheck,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -20,16 +23,10 @@ const NAV_SECTIONS = [
   {
     label: "工作台",
     items: [
-      { to: "/dashboard", label: "控制台", icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: "核心",
-    items: [
-      { to: "/agents", label: "智能体", icon: Bot },
-      { to: "/pipelines", label: "流水线", icon: GitBranch },
-      { to: "/runs", label: "运行", icon: Play },
-      { to: "/scheduler", label: "定时调度", icon: Clock },
+      { to: "/today", label: "今日", icon: LayoutDashboard },
+      { to: "/materials", label: "素材池", icon: Newspaper },
+      { to: "/writing", label: "写作室", icon: PenTool },
+      { to: "/review", label: "复盘室", icon: CalendarCheck },
     ],
   },
   {
@@ -39,8 +36,12 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: "系统",
+    label: "系统后台",
     items: [
+      { to: "/agents", label: "智能体", icon: Bot },
+      { to: "/pipelines", label: "流水线", icon: GitBranch },
+      { to: "/runs", label: "运行", icon: Play },
+      { to: "/scheduler", label: "定时调度", icon: Clock },
       { to: "/mcp", label: "MCP 服务器", icon: Cable },
       { to: "/audit", label: "审计日志", icon: Shield },
     ],
@@ -199,8 +200,8 @@ export default function Layout() {
               )}
               {section.items.map(({ to, label, icon: Icon }) => {
                 const isActive =
-                  to === "/dashboard"
-                    ? currentPath === "/" || currentPath === "/dashboard"
+                  to === "/today"
+                    ? currentPath === "/" || currentPath === "/today" || currentPath === "/dashboard"
                     : currentPath.startsWith(to);
                 return (
                   <NavLink

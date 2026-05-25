@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session, engine
 from app.models.models import Base
 from app.models.models import Agent, Space, PipelineModel
-from app.api import agents, plans, steps, artifacts, news, documents, dashboard, internal, rag, docmost, webhook, exports, wiki, tags, memos, checkpoints, pipelines, scheduler, knowledge, audit, mcp_servers, memories, chat
+from app.api import agents, plans, steps, artifacts, news, documents, dashboard, internal, rag, docmost, webhook, exports, wiki, tags, memos, checkpoints, pipelines, scheduler, knowledge, audit, mcp_servers, memories, chat, today, materials, writing, review
 from app.middleware.audit import AuditMiddleware
 
 audit_logger = logging.getLogger("pi_console.audit")
@@ -191,6 +191,10 @@ app.include_router(audit.router, prefix="/api", tags=["audit"])
 app.include_router(mcp_servers.router, prefix="/api", tags=["mcp"])
 app.include_router(memories.router, prefix="/api", tags=["memories"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
+app.include_router(today.router, prefix="/api", tags=["today"])
+app.include_router(materials.router, prefix="/api", tags=["materials"])
+app.include_router(writing.router, prefix="/api", tags=["writing"])
+app.include_router(review.router, prefix="/api", tags=["review"])
 
 if os.path.isdir(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="static-assets")
