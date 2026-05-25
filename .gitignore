@@ -13,7 +13,9 @@ venv/
 env/
 node_modules/
 dist/
-*.local
+.env
+.env.local
+!*.example
 .DS_Store
 *.swp
 *.swo
