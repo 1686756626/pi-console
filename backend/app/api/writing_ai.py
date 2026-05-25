@@ -2,27 +2,23 @@ import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.models import WritingProject, WritingDraft
+from app.models.models import WritingProject, WritingDraft, WritingMaterial
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-GLM_BASE = getattr(settings, "glm_api_key", None) and "https://open.bigmodel.cn/api/coding/paas/v4" or ""
-GLM_KEY = getattr(settings, "glm_api_key", "")
-GLM_MODEL = "glm-5.1"
 
 
 async def _glm_single_turn(system: str, user: str, max_tokens: int = 4096) -> str:
     async with httpx.AsyncClient(timeout=120) as hc:
         resp = await hc.post(
-            f"{GLM_BASE}/chat/completions",
+            f"{settings.glm_base_url}/chat/completions",
             json={
-                "model": GLM_MODEL,
+                "model": settings.glm_model,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -31,7 +27,7 @@ async def _glm_single_turn(system: str, user: str, max_tokens: int = 4096) -> st
                 "max_tokens": max_tokens,
             },
             headers={
-                "Authorization": f"Bearer {GLM_KEY}",
+                "Authorization": f"Bearer {settings.glm_api_key}",
                 "Content-Type": "application/json",
             },
         )
@@ -43,7 +39,7 @@ async def _glm_single_turn(system: str, user: str, max_tokens: int = 4096) -> st
 
 def _build_materials_block(materials: list) -> str:
     if not materials:
-        return "（暂无已采集素材）"
+        return "(暂无已采集素材)"
     parts = []
     for m in materials[:15]:
         src = m.source_type
@@ -53,8 +49,30 @@ def _build_materials_block(materials: list) -> str:
     return "\n\n".join(parts)
 
 
+async def _next_draft_version(db: AsyncSession, project_id: str) -> int:
+    max_ver = await db.scalar(
+        select(func.max(WritingDraft.version)).where(WritingDraft.project_id == project_id)
+    )
+    return (max_ver or 0) + 1
+
+
+async def _save_draft(db: AsyncSession, project_id: str, content: str, label: str) -> WritingDraft:
+    next_ver = await _next_draft_version(db, project_id)
+    draft = WritingDraft(
+        project_id=project_id,
+        version=next_ver,
+        content=content,
+        label=label,
+    )
+    db.add(draft)
+    await db.commit()
+    await db.refresh(draft)
+    return draft
+
+
 class SkeletonRequest(BaseModel):
     style: str | None = None
+    save: bool = False
 
 
 @router.post("/writing/projects/{project_id}/ai/skeleton")
@@ -67,7 +85,7 @@ async def ai_skeleton(
     if not p:
         raise HTTPException(404, "项目不存在")
 
-    materials = _load_materials(p)
+    materials = await _load_materials(db, project_id)
     style_note = ""
     if body and body.style:
         style_note = f"\n文章风格倾向: {body.style}"
@@ -89,12 +107,18 @@ async def ai_skeleton(
     )
 
     result = await _glm_single_turn(system, user_msg)
-    return {"skeleton": result}
+
+    if body and body.save:
+        p.outline = result
+        await db.commit()
+
+    return {"skeleton": result, "saved_to": "outline" if (body and body.save) else None}
 
 
 @router.post("/writing/projects/{project_id}/ai/counter-arguments")
 async def ai_counter_arguments(
     project_id: str,
+    body: dict | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     p = await db.get(WritingProject, project_id)
@@ -116,7 +140,20 @@ async def ai_counter_arguments(
     user_msg = f"标题: {p.title}\n选题: {p.topic or '(未填)'}\n\n文章提纲:\n{outline}"
 
     result = await _glm_single_turn(system, user_msg)
-    return {"counter_arguments": result}
+
+    save = (body or {}).get("save", False)
+    draft_id = None
+    version = None
+    if save:
+        draft = await _save_draft(db, project_id, result, "反方观点分析")
+        draft_id = draft.id
+        version = draft.version
+
+    return {
+        "counter_arguments": result,
+        "draft_id": draft_id,
+        "version": version,
+    }
 
 
 class DraftGenRequest(BaseModel):
@@ -137,7 +174,7 @@ async def ai_generate_draft(
     if not p.outline:
         raise HTTPException(400, "请先撰写提纲再生成草稿")
 
-    materials = _load_materials(p)
+    materials = await _load_materials(db, project_id)
     focus_note = ""
     if body and body.focus:
         focus_note = f"\n特别关注: {body.focus}"
@@ -162,26 +199,14 @@ async def ai_generate_draft(
     result = await _glm_single_turn(system, user_msg, max_tokens=8192)
 
     label = (body.label if body else None) or "AI 生成草稿"
-    from sqlalchemy import func
-    max_ver = await db.scalar(
-        select(func.max(WritingDraft.version)).where(WritingDraft.project_id == project_id)
-    )
-    next_ver = (max_ver or 0) + 1
-    draft = WritingDraft(
-        project_id=project_id,
-        version=next_ver,
-        content=result,
-        label=label,
-    )
-    db.add(draft)
-    await db.commit()
-    await db.refresh(draft)
-    return {"draft_id": draft.id, "version": next_ver, "label": label, "content": result}
+    draft = await _save_draft(db, project_id, result, label)
+    return {"draft_id": draft.id, "version": draft.version, "label": label, "content": result}
 
 
 class CheckRequest(BaseModel):
     check_type: str = Field(default="all", description="fact | logic | style | all")
     draft_content: str | None = None
+    save: bool = False
 
 
 @router.post("/writing/projects/{project_id}/ai/check")
@@ -219,6 +244,11 @@ async def ai_check(
     if not checks:
         checks = ["fact", "logic", "style"]
 
+    CHECK_NAMES = {
+        "fact": "事实核查",
+        "logic": "逻辑检查",
+        "style": "风格审查",
+    }
     PROMPTS = {
         "fact": (
             "你是事实核查专家。检查文章中的事实性声明，标注：\n"
@@ -257,8 +287,26 @@ async def ai_check(
         except Exception as e:
             results[check_name] = f"检查失败: {str(e)}"
 
-    return {"checks": results}
+    draft_id = None
+    version = None
+    if body.save:
+        combined = "\n\n---\n\n".join(
+            f"## {CHECK_NAMES.get(cn, cn)}\n{results[cn]}"
+            for cn in checks
+        )
+        draft = await _save_draft(db, project_id, combined, f"三检报告 ({'+'.join(checks)})")
+        draft_id = draft.id
+        version = draft.version
+
+    return {
+        "checks": results,
+        "draft_id": draft_id,
+        "version": version,
+    }
 
 
-def _load_materials(p):
-    return getattr(p, "materials", []) or []
+async def _load_materials(db: AsyncSession, project_id: str) -> list:
+    result = await db.execute(
+        select(WritingMaterial).where(WritingMaterial.project_id == project_id)
+    )
+    return list(result.scalars().all())

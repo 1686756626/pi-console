@@ -11,10 +11,6 @@ from app.models.models import NewsItem, Memo, Artifact, Run, WritingProject
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-GLM_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
-GLM_KEY = getattr(settings, "glm_api_key", "")
-GLM_MODEL = "glm-5.1"
-
 
 @router.get("/today/ai-suggestions")
 async def ai_suggestions(db: AsyncSession = Depends(get_db)):
@@ -104,9 +100,9 @@ async def ai_suggestions(db: AsyncSession = Depends(get_db)):
     try:
         async with httpx.AsyncClient(timeout=60) as hc:
             resp = await hc.post(
-                f"{GLM_BASE}/chat/completions",
+                f"{settings.glm_base_url}/chat/completions",
                 json={
-                    "model": GLM_MODEL,
+                    "model": settings.glm_model,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": user_msg},
@@ -115,7 +111,7 @@ async def ai_suggestions(db: AsyncSession = Depends(get_db)):
                     "max_tokens": 1024,
                 },
                 headers={
-                    "Authorization": f"Bearer {GLM_KEY}",
+                    "Authorization": f"Bearer {settings.glm_api_key}",
                     "Content-Type": "application/json",
                 },
             )

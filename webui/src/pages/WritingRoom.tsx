@@ -541,7 +541,7 @@ export default function WritingRoom() {
     handlePatch({ status: 'published' })
   }
 
-  const callAi = async (action: string, extraBody?: Record<string, string>) => {
+  const callAi = async (action: string, extraBody?: Record<string, unknown>) => {
     if (!project) return
     setAiLoading(action)
     setAiResult(null)
@@ -558,10 +558,29 @@ export default function WritingRoom() {
       if (data.draft_id) {
         await fetchProject(project.id)
       }
+      if (data.saved_to === 'outline') {
+        setEditOutline(content)
+        await fetchProject(project.id)
+      }
     } catch (e: any) {
       setAiResult({ key: action, content: `AI 调用失败: ${e.response?.data?.detail || e.message}` })
     } finally {
       setAiLoading(null)
+    }
+  }
+
+  const saveAiResult = async () => {
+    if (!project || !aiResult) return
+    const action = aiResult.key
+    if (action === 'skeleton') {
+      await callAi('skeleton', { save: true, style: '' })
+      setAiResult(null)
+    } else if (action === 'counter-arguments') {
+      await callAi('counter-arguments', { save: true })
+      setAiResult(null)
+    } else if (action === 'check') {
+      await callAi('check', { check_type: 'all', draft_content: editDraft, save: true })
+      setAiResult(null)
     }
   }
 
@@ -698,12 +717,18 @@ export default function WritingRoom() {
                       <span style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--ht-accent)' }}>
                         AI 分析结果
                       </span>
-                      <button
-                        onClick={() => setAiResult(null)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ht-text-3)', fontSize: '0.75rem' }}
-                      >
-                        关闭
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <Button variant="primary" size="sm" onClick={saveAiResult} disabled={saving}>
+                          <Check size={12} />
+                          {aiResult.key === 'skeleton' ? '保存到提纲' : '保存为新版本'}
+                        </Button>
+                        <button
+                          onClick={() => setAiResult(null)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ht-text-3)', fontSize: '0.75rem' }}
+                        >
+                          关闭
+                        </button>
+                      </div>
                     </div>
                     <div style={{ whiteSpace: 'pre-wrap' }}>{aiResult.content}</div>
                   </div>

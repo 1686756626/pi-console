@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from sqlalchemy import select
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 AGENTS_DIR = os.environ.get(
@@ -13,9 +15,9 @@ AGENTS_DIR = os.environ.get(
     str(Path(__file__).resolve().parent.parent / "agents"),
 )
 
-GLM_BASE_URL = os.environ.get("GLM_BASE_URL", "https://open.bigmodel.cn/api/coding/paas/v4")
-GLM_API_KEY = os.environ.get("GLM_API_KEY", "")
-GLM_MODEL = os.environ.get("GLM_MODEL", "glm-5.1")
+GLM_BASE_URL = settings.glm_base_url
+GLM_API_KEY = settings.glm_api_key
+GLM_MODEL = settings.glm_model
 
 BUILTIN_TOOL_DEFINITIONS = {
     "save_artifact": {

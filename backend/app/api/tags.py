@@ -161,16 +161,16 @@ async def ai_tag_item(target_type: str, target_id: str, db: AsyncSession = Depen
 {text[:2000]}"""
 
     import os
-    api_key = os.environ.get("GLM_API_KEY", "")
-    if not api_key:
+    from app.config import settings
+    if not settings.glm_api_key:
         raise HTTPException(500, "GLM_API_KEY not configured")
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
-            "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
+            f"{settings.glm_base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.glm_api_key}"},
             json={
-                "model": "glm-4-flash",
+                "model": settings.glm_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
                 "max_tokens": 200,
